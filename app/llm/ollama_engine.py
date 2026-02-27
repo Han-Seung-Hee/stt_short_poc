@@ -6,7 +6,7 @@ Mac/Linux 양쪽에서 동일하게 동작합니다.
 
 import logging
 import time
-from typing import Optional
+from typing import Optional, List
 
 import httpx
 
@@ -37,9 +37,9 @@ class OllamaEngine(LLMEngine):
     def __init__(
         self,
         base_url: str = "http://localhost:11434",
-        model_name: str = "EEVE-Korean-10.8B-v1.0:Q4_K_M",
-        timeout_sec: int = 120,
-        max_retries: int = 2,
+        model_name: str = "qwen2.5:7b",
+        timeout_sec: int = 3600,
+        max_retries: int = 3,
     ):
         self.base_url = base_url.rstrip("/")
         self.model_name = model_name
@@ -66,8 +66,14 @@ class OllamaEngine(LLMEngine):
                 model_name=self.model_name,
             )
 
-        prompt = system_prompt or DEFAULT_SYSTEM_PROMPT
-        user_message = f"다음 고객 상담 통화 내용을 3줄로 요약해 주세요:\n\n{text}"
+        if system_prompt is None:
+            prompt = DEFAULT_SYSTEM_PROMPT
+            user_message = f"다음 고객 상담 통화 내용을 3줄로 요약해 주세요:\n\n{text}"
+            num_predict = 512
+        else:
+            prompt = system_prompt
+            user_message = f"다음 주어진 텍스트의 오탈자만 교정해서 원문 전체를 다시 출력해 주세요:\n\n{text}"
+            num_predict = 4096  # 전체 텍스트 출력을 위해 토큰 수 대폭 확장
 
         start_time = time.time()
 
@@ -80,9 +86,10 @@ class OllamaEngine(LLMEngine):
             ],
             "stream": False,
             "options": {
-                "temperature": 0.3,       # 낮은 temperature로 일관된 요약
+                "temperature": 0.3,       # 낮은 temperature로 일관된 교정/요약
                 "top_p": 0.9,
-                "num_predict": 512,       # 3줄 요약이므로 짧게
+                "num_predict": num_predict,
+                "num_ctx": 4096,          # 긴 문서 처리를 위해 컨텍스트 윈도우 확보
             },
         }
 
@@ -105,6 +112,9 @@ class OllamaEngine(LLMEngine):
                 elapsed = time.time() - start_time
 
                 summary_text = data.get("message", {}).get("content", "").strip()
+
+                if len(summary_text) == 0:
+                    raise ValueError("Ollama가 빈 문자열(0자)을 반환했습니다. 컨텍스트 초과 또는 모델 로딩 오류일 수 있습니다.")
 
                 # 토큰 정보 추출 (Ollama가 제공하는 경우)
                 prompt_tokens = data.get("prompt_eval_count", 0)
@@ -159,7 +169,7 @@ class OllamaEngine(LLMEngine):
     def get_engine_name(self) -> str:
         return f"ollama ({self.model_name})"
 
-    def list_models(self) -> list[str]:
+    def list_models(self) -> List[str]:
         """Ollama에 로드된 모델 목록을 반환합니다."""
         try:
             with httpx.Client(timeout=10) as client:

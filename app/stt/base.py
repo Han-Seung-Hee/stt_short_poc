@@ -5,7 +5,7 @@ Mac(mlx-whisper)과 Linux(faster-whisper)를 동일한 인터페이스로 사용
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, List
 
 
 @dataclass
@@ -20,7 +20,7 @@ class Segment:
 class STTResult:
     """STT 처리 결과."""
     text: str                            # 전체 인식 텍스트
-    segments: list[Segment] = field(default_factory=list)
+    segments: List[Segment] = field(default_factory=list)
     language: str = "ko"                 # 감지/지정 언어
     duration_sec: float = 0.0            # 원본 오디오 길이(초)
     model_name: str = ""                 # 사용된 모델

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -145,7 +146,9 @@
         }
 
         @keyframes spin {
-            to { transform: rotate(360deg); }
+            to {
+                transform: rotate(360deg);
+            }
         }
 
         .results {
@@ -215,8 +218,24 @@
             border-radius: 100px;
             border: 1px solid var(--border);
         }
+
+        .disclaimer {
+            margin-top: 32px;
+            padding: 20px;
+            background-color: #f1f5f9;
+            border-radius: 8px;
+            font-size: 0.8125rem;
+            color: #64748b;
+            line-height: 1.6;
+            text-align: center;
+        }
+
+        .disclaimer strong {
+            color: #475569;
+        }
     </style>
 </head>
+
 <body>
     <div class="container">
         <header>
@@ -241,6 +260,8 @@
             <div id="loading">
                 <div class="spinner"></div>
                 <span id="loading-status">AI 모델 구동 중... (STT 단계)</span>
+                <span id="timer-status"
+                    style="font-weight: 700; color: var(--primary); margin-left: 4px;">(00:00)</span>
             </div>
 
             <div class="results">
@@ -260,10 +281,27 @@
                 <span id="time-info" class="tag">소요시간: -</span>
             </div>
         </div>
+
+        <div class="disclaimer">
+            본 시연에 사용된 음성/텍스트 데이터는 <strong>AI Hub(과학기술정보통신부, NIA)</strong>에서 제공하는 공공 데이터를 활용하였습니다.<br>
+            해당 데이터는 기술 검증(PoC) 목적으로만 한시적으로 사용되며, 시연 종료 후 즉시 파기될 예정입니다.<br>
+            본 시연의 내용은 실제 상담 사례가 아니며, 개인정보 비식별화 처리가 완료된 테스트 데이터임을 밝힙니다.
+        </div>
     </div>
 
     <script>
         let selectedFile = null;
+        let timerInterval = null;
+        let startTime = null;
+
+        function updateTimer() {
+            if (!startTime) return;
+            const now = new Date();
+            const diff = Math.floor((now - startTime) / 1000);
+            const minutes = String(Math.floor(diff / 60)).padStart(2, '0');
+            const seconds = String(diff % 60).padStart(2, '0');
+            document.getElementById('timer-status').innerText = `(${minutes}:${seconds})`;
+        }
 
         function handleFileSelect(input) {
             if (input.files && input.files[0]) {
@@ -319,12 +357,17 @@
             transcriptArea.innerText = '인식 중...';
             summaryArea.innerText = '대기 중...';
             loadingStatus.innerText = 'Apple Silicon Metal 가속으로 STT 분석 중...';
+            document.getElementById('timer-status').innerText = '(00:00)';
+
+            // 타이머 시작
+            startTime = new Date();
+            timerInterval = setInterval(updateTimer, 1000);
 
             const formData = new FormData();
             formData.append('file', selectedFile);
 
             try {
-                const response = await fetch('http://localhost:8000/api/v1/process', {
+                const response = await fetch('http://localhost:8080/api/v1/process', {
                     method: 'POST',
                     body: formData
                 });
@@ -335,7 +378,7 @@
 
                 transcriptArea.innerText = data.transcript || '(인식 결과 없음)';
                 summaryArea.innerText = data.summary || '(요약 실패)';
-                
+
                 // 메타 정보 표시
                 document.getElementById('stt-info').innerText = `STT: ${data.model_info.stt}`;
                 document.getElementById('llm-info').innerText = `LLM: ${data.model_info.llm}`;
@@ -347,10 +390,12 @@
                 transcriptArea.innerText = '오류가 발생했습니다.';
                 summaryArea.innerText = '오류가 발생했습니다.';
             } finally {
+                if (timerInterval) clearInterval(timerInterval);
                 startBtn.disabled = false;
                 loading.style.display = 'none';
             }
         }
     </script>
 </body>
+
 </html>

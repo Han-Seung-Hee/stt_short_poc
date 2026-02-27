@@ -137,10 +137,32 @@ class ProcessingPipeline:
             return result
 
         try:
-            logger.info(f"=== 요약 시작: {len(stt_result.text)}자 입력 ===")
+            if self.config.llm.refine_enabled:
+                logger.info(f"=== 텍스트 정제(오탈자 교정) 시작: {len(stt_result.text)}자 입력 ===")
+                
+                refine_prompt = """당신은 STT(음성인식) 텍스트 전문 교정기입니다.
+다음 규칙을 엄격하게 지켜주세요:
+1. **절대 원문을 요약하거나 생략하지 마세요.**
+2. 입력된 텍스트의 모든 문장을 처음부터 끝까지 빠짐없이 모두 출력해야 합니다.
+3. 오로지 잘못 인식된 글자(오탈자)나 문맥상 심하게 어색한 단어만 매끄럽게 수정해 주세요.
+4. 원본의 화법(존댓말/반말)과 길이를 그대로 유지하세요."""
+
+                refine_result: SummaryResult = self.llm_engine.summarize(
+                    text=stt_result.text,
+                    system_prompt=refine_prompt,
+                )
+                
+                # 정제된 텍스트로 트랜스크립트 덮어쓰기
+                refined_text = refine_result.summary
+                result.transcript = refined_text
+                logger.info(f"텍스트 정제 완료! (원본 {len(stt_result.text)}자 -> 정제 {len(refined_text)}자)")
+            else:
+                refined_text = stt_result.text
+
+            logger.info(f"=== 요약 시작: {len(refined_text)}자 입력 ===")
 
             summary_result: SummaryResult = self.llm_engine.summarize(
-                text=stt_result.text,
+                text=refined_text,
                 system_prompt=system_prompt,
             )
 

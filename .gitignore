@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+env.bak/
+venv.bak/
+
+# Project Data
+base_data/
+test_ready/
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo

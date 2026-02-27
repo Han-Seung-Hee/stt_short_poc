@@ -37,6 +37,7 @@ class LLMConfig:
     model_name: str = "EEVE-Korean-10.8B-v1.0:Q4_K_M"
     timeout_sec: int = 120
     max_retries: int = 2
+    refine_enabled: bool = False  # 빠른 요약을 위해 기본값 False
 
 
 @dataclass

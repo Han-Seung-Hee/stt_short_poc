@@ -108,11 +108,15 @@ class MLXWhisperEngine(STTEngine):
         """단일 파일 전체를 한번에 처리합니다."""
         import mlx_whisper
 
+        # 콜센터 도메인에 맞는 프롬프트를 주어 인식률(CER) 향상 유도
+        initial_prompt = "다음은 고객센터 상담원과 고객의 통화 내용입니다. 자연스러운 한국어 존댓말이 사용됩니다."
+
         raw = mlx_whisper.transcribe(
             audio_path,
             path_or_hf_repo=self._resolved_model,
             language=language,
             fp16=True,
+            initial_prompt=initial_prompt,
             verbose=False,
         )
 
@@ -124,8 +128,11 @@ class MLXWhisperEngine(STTEngine):
                 text=seg.get("text", "").strip(),
             ))
 
+        # 문단처럼 보이지 않고 줄바꿈을 주기 위해 segments 리스트를 조인
+        formatted_text = "\n".join([seg.text for seg in segments])
+
         return STTResult(
-            text=raw.get("text", "").strip(),
+            text=formatted_text,
             segments=segments,
             language=language,
         )
@@ -180,8 +187,10 @@ class MLXWhisperEngine(STTEngine):
             # 청크 간 메모리 정리
             gc.collect()
 
+        formatted_text = "\n".join([seg.text for seg in all_segments])
+
         return STTResult(
-            text=" ".join(all_text_parts),
+            text=formatted_text,
             segments=all_segments,
             language=language,
         )
