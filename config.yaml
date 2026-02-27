@@ -5,7 +5,7 @@
 
 stt:
   engine: "mlx"              # "mlx" (Mac) | "faster" (Linux CPU)
-  model_name: "small"        # tiny, base, small, medium, large-v3
+  model_name: "small"        # tiny, base, small, medium, large-v3 (PC가 힘들면 "base" 추천)
   # model_path: "/path/to/local/whisper-small-mlx"  # 오프라인: 로컬 모델 경로
   language: "ko"
   chunk:
