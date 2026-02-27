@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 상담 음성 요약 PoC</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --bg: #f8fafc;
+            --card: #ffffff;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+        }
+
+        body {
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+            background-color: var(--bg);
+            color: var(--text-main);
+            margin: 0;
+            padding: 40px 20px;
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 800;
+            margin-bottom: 10px;
+            letter-spacing: -0.025em;
+        }
+
+        header p {
+            color: var(--text-muted);
+            font-size: 1.125rem;
+        }
+
+        .main-card {
+            background: var(--card);
+            border-radius: 16px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+            padding: 32px;
+            border: 1px solid var(--border);
+        }
+
+        .upload-area {
+            border: 2px dashed var(--border);
+            border-radius: 12px;
+            padding: 40px;
+            text-align: center;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            margin-bottom: 24px;
+        }
+
+        .upload-area:hover {
+            border-color: var(--primary);
+            background-color: #eff6ff;
+        }
+
+        .upload-area.dragging {
+            border-color: var(--primary);
+            background-color: #dbeafe;
+        }
+
+        .upload-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            display: block;
+        }
+
+        #file-name {
+            font-weight: 500;
+            color: var(--text-main);
+            margin-bottom: 4px;
+        }
+
+        .upload-hint {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+
+        .controls {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 32px;
+        }
+
+        button {
+            flex: 1;
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 14px 24px;
+            font-size: 1rem;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        button:hover {
+            background-color: var(--primary-hover);
+        }
+
+        button:disabled {
+            background-color: var(--text-muted);
+            cursor: not-allowed;
+        }
+
+        #loading {
+            display: none;
+            text-align: center;
+            padding: 24px;
+            background: #f1f5f9;
+            border-radius: 8px;
+            margin-bottom: 24px;
+        }
+
+        .spinner {
+            width: 24px;
+            height: 24px;
+            border: 3px solid rgba(37, 99, 235, 0.2);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            vertical-align: middle;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .results {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 24px;
+        }
+
+        @media (min-width: 768px) {
+            .results {
+                grid-template-columns: 1.5fr 1fr;
+            }
+        }
+
+        .result-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .panel-label {
+            font-weight: 700;
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .content-area {
+            background: #f8fafc;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            min-height: 300px;
+            max-height: 500px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-size: 0.9375rem;
+            color: var(--text-main);
+            line-height: 1.7;
+        }
+
+        #summary-content {
+            background: #eff6ff;
+            border-color: #bfdbfe;
+            color: #1e40af;
+            font-weight: 500;
+        }
+
+        .meta-info {
+            margin-top: 24px;
+            padding-top: 24px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            font-size: 0.8125rem;
+            color: var(--text-muted);
+        }
+
+        .tag {
+            background: #f1f5f9;
+            padding: 4px 10px;
+            border-radius: 100px;
+            border: 1px solid var(--border);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎙️ AI 상담 요약 시스템</h1>
+            <p>M1 Mac Apple Silicon 최적화 STT + 3줄 요약 PoC</p>
+        </header>
+
+        <div class="main-card">
+            <div id="drop-area" class="upload-area" onclick="document.getElementById('file-input').click()">
+                <span class="upload-icon">📁</span>
+                <p id="file-name">클릭하거나 음성 파일(WAV)을 드래그하세요</p>
+                <p class="upload-hint">지원 포맷: WAV (16kHz 권장)</p>
+                <input type="file" id="file-input" accept=".wav" style="display:none" onchange="handleFileSelect(this)">
+            </div>
+
+            <div class="controls">
+                <button id="start-btn" onclick="startProcessing()" disabled>
+                    <span>⚡ 분석 및 요약 시작</span>
+                </button>
+            </div>
+
+            <div id="loading">
+                <div class="spinner"></div>
+                <span id="loading-status">AI 모델 구동 중... (STT 단계)</span>
+            </div>
+
+            <div class="results">
+                <div class="result-panel">
+                    <div class="panel-label">💬 인식된 텍스트 원문 (Transcript)</div>
+                    <div id="transcript-content" class="content-area">분석을 시작하면 여기에 텍스트가 표시됩니다.</div>
+                </div>
+                <div class="result-panel">
+                    <div class="panel-label">✨ 핵심 3줄 요약 (Summary)</div>
+                    <div id="summary-content" class="content-area">요약 결과가 여기에 표시됩니다.</div>
+                </div>
+            </div>
+
+            <div id="meta-info" class="meta-info" style="display:none">
+                <span id="stt-info" class="tag">STT: -</span>
+                <span id="llm-info" class="tag">LLM: -</span>
+                <span id="time-info" class="tag">소요시간: -</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let selectedFile = null;
+
+        function handleFileSelect(input) {
+            if (input.files && input.files[0]) {
+                selectedFile = input.files[0];
+                document.getElementById('file-name').innerText = selectedFile.name;
+                document.getElementById('start-btn').disabled = false;
+            }
+        }
+
+        // 드래그 앤 드롭 방지
+        const dropArea = document.getElementById('drop-area');
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropArea.addEventListener(eventName, () => dropArea.classList.add('dragging'), false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, () => dropArea.classList.remove('dragging'), false);
+        });
+
+        dropArea.addEventListener('drop', e => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            if (files.length > 0 && files[0].name.toLowerCase().endsWith('.wav')) {
+                document.getElementById('file-input').files = files;
+                handleFileSelect(document.getElementById('file-input'));
+            } else {
+                alert('WAV 파일만 업로드 가능합니다.');
+            }
+        });
+
+        async function startProcessing() {
+            if (!selectedFile) return;
+
+            const startBtn = document.getElementById('start-btn');
+            const loading = document.getElementById('loading');
+            const transcriptArea = document.getElementById('transcript-content');
+            const summaryArea = document.getElementById('summary-content');
+            const metaArea = document.getElementById('meta-info');
+            const loadingStatus = document.getElementById('loading-status');
+
+            startBtn.disabled = true;
+            loading.style.display = 'block';
+            metaArea.style.display = 'none';
+            transcriptArea.innerText = '인식 중...';
+            summaryArea.innerText = '대기 중...';
+            loadingStatus.innerText = 'Apple Silicon Metal 가속으로 STT 분석 중...';
+
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+
+            try {
+                const response = await fetch('http://localhost:8000/api/v1/process', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) throw new Error('서버 응답 오류 (모델 로드 상태 확인 필요)');
+
+                const data = await response.json();
+
+                transcriptArea.innerText = data.transcript || '(인식 결과 없음)';
+                summaryArea.innerText = data.summary || '(요약 실패)';
+                
+                // 메타 정보 표시
+                document.getElementById('stt-info').innerText = `STT: ${data.model_info.stt}`;
+                document.getElementById('llm-info').innerText = `LLM: ${data.model_info.llm}`;
+                document.getElementById('time-info').innerText = `총 소요시간: ${data.processing_time.total_sec}초`;
+                metaArea.style.display = 'flex';
+
+            } catch (error) {
+                alert('오류 발생: ' + error.message);
+                transcriptArea.innerText = '오류가 발생했습니다.';
+                summaryArea.innerText = '오류가 발생했습니다.';
+            } finally {
+                startBtn.disabled = false;
+                loading.style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>

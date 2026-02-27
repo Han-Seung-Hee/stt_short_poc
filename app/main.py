@@ -16,6 +16,7 @@ from typing import Optional
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_config, AppConfig
 from app.pipeline import ProcessingPipeline, PipelineResult
@@ -126,6 +127,15 @@ app = FastAPI(
     description="폐쇄망 환경에서 음성파일을 텍스트로 변환하고 3줄 요약을 제공하는 API",
     version="0.1.0",
     lifespan=lifespan,
+)
+
+# === CORS 설정 추가 ===
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # 모든 출처 허용 (PoC용)
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
