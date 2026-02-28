@@ -16,27 +16,27 @@
 ## 아키텍처
 
 ```
-                    ┌─────────────────────────────┐
+                    ┌────────────────────────────-─┐
                     │       FastAPI Server         │
                     │       (port 8000)            │
                     │                              │
-  WAV Upload ─────▶│  POST /api/v1/process        │
+  WAV Upload ─────▶ │  POST /api/v1/process        │
                     │       │                      │
                     │       ▼                      │
                     │  ┌──────────────┐            │
                     │  │  STT Engine  │ mlx-whisper│
-                    │  │(스테레오 분리)│ pydub      │
+                    │  │(스테레오 분리)│ pydub        │
                     │  └──────┬───────┘            │
-                    │         │ transcript          │
-                    │         ▼                     │
+                    │         │ transcript         │
+                    │         ▼                    │
                     │  ┌──────────────┐            │
                     │  │  LLM Engine  │ Ollama     │
-                    │  │  (3줄 요약)  │ qwen2.5:7b │
+                    │  │  (3줄 요약)    │ qwen2.5:7b |
                     │  └──────┬───────┘            │
-                    │         │ summary             │
-                    │         ▼                     │
+                    │         │ summary            │
+                    │         ▼                    │
                     │   JSON Response ─────────────┼──▶ { transcript, summary }
-                    └─────────────────────────────┘
+                    └─────────────────────────────-┘
 ```
 
 
@@ -83,7 +83,7 @@ python prepare_data.py MEN0005946
 **4. STT + 요약 API 서버 시작**
 가상환경(`(.venv)`)이 활성화된 터미널에서 아래 명령어로 서버를 가동합니다.
 ```bash
-uvicorn app.main:app --host 0.0.0.0 --port 8000
+kill -9 $(lsof -t -i:8080) 2>/dev/null; .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8080
 ```
 *`Application startup complete.` 문구가 뜨면 서버 가동 완료입니다.*
 
