@@ -61,36 +61,76 @@ class FasterWhisperEngine(STTEngine):
         language: str = "ko",
         chunk_enabled: bool = False,
         chunk_length_sec: int = 300,
+        speaker_separation: bool = False,
     ) -> STTResult:
         """음성 파일을 텍스트로 변환합니다."""
         if self._model is None:
             self._load_model()
 
         import time
+        import tempfile
+        from pathlib import Path
 
         start_time = time.time()
+        
+        is_stereo_separated = False
+        if speaker_separation:
+            from pydub import AudioSegment
+            audio_info = AudioSegment.from_wav(audio_path)
+            if audio_info.channels == 2:
+                is_stereo_separated = True
+            else:
+                logger.warning("스테레오 분리 옵션이 켜져 있으나, 음성이 모노입니다. 기본 모드로 진행합니다.")
 
-        segments_gen, info = self._model.transcribe(
-            audio_path,
-            language=language,
-            beam_size=5,
-            vad_filter=True,
-        )
+        def _transcribe_file(path: str) -> list:
+            segments_gen, _ = self._model.transcribe(
+                path,
+                language=language,
+                beam_size=5,
+                vad_filter=True,
+                initial_prompt="다음은 고객센터 상담원과 고객의 통화 내용입니다. 자연스러운 한국어 존댓말이 사용됩니다."
+            )
+            segs = []
+            for seg in segments_gen:
+                segs.append(Segment(start=seg.start, end=seg.end, text=seg.text.strip()))
+            return segs
 
-        all_segments = []
-        text_parts = []
-        for seg in segments_gen:
-            all_segments.append(Segment(
-                start=seg.start,
-                end=seg.end,
-                text=seg.text.strip(),
-            ))
-            text_parts.append(seg.text.strip())
+        if is_stereo_separated:
+            from pydub import AudioSegment
+            logger.info("============== 스테레오 화자 분리 모드로 인식 시작 (Linux CPU) ==============")
+            audio = AudioSegment.from_wav(audio_path)
+            left, right = audio.split_to_mono()
+            
+            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_l, \
+                 tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_r:
+                 
+                left.export(tmp_l.name, format="wav")
+                right.export(tmp_r.name, format="wav")
+                
+                logger.info("[진행중] 상담사 (채널 1 - Left) STT 분석 중...")
+                segs_left = _transcribe_file(tmp_l.name)
+                for seg in segs_left:
+                    seg.text = f"상담사: {seg.text}"
+                    
+                logger.info("[진행중] 고객 (채널 2 - Right) STT 분석 중...")
+                segs_right = _transcribe_file(tmp_r.name)
+                for seg in segs_right:
+                    seg.text = f"고객: {seg.text}"
+                    
+            Path(tmp_l.name).unlink(missing_ok=True)
+            Path(tmp_r.name).unlink(missing_ok=True)
+            
+            all_segments = segs_left + segs_right
+            all_segments.sort(key=lambda x: x.start)
+        else:
+            all_segments = _transcribe_file(audio_path)
 
         elapsed = time.time() - start_time
+        
+        formatted_text = "\\n".join([seg.text for seg in all_segments])
 
         return STTResult(
-            text=" ".join(text_parts),
+            text=formatted_text,
             segments=all_segments,
             language=language,
             duration_sec=elapsed,

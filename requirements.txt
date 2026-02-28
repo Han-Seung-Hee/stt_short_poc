@@ -15,8 +15,15 @@ python-multipart>=0.0.6
 mlx>=0.5.0
 mlx-whisper>=0.4.0
 
-# === STT (Linux CPU 전용) — Mac에서는 주석 처리 ===
+# === STT (Linux CPU/GPU 전용) — Mac에서는 주석 처리 ===
 # faster-whisper>=1.0.0
+
+# === NVIDIA GPU 가속 (Linux 필수) ===
+# CUDA libcudnn 에러 방지를 위해 GPU 환경이라면 아래 주석을 전면 해제하세요.
+# --extra-index-url https://download.pytorch.org/whl/cu118
+# torch
+# torchvision
+# torchaudio
 
 # === 청크 분할 (선택) ===
 pydub>=0.25.1

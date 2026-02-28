@@ -70,7 +70,7 @@ curl -L -o Ollama-darwin.zip https://ollama.com/download/Ollama-darwin.zip
 
 # Ollama를 설치 & 실행 후 모델 다운로드
 # (외부망 Mac에서 한 번 실행해야 모델 파일을 받을 수 있습니다)
-ollama pull EEVE-Korean-10.8B-v1.0:Q4_K_M
+ollama pull qwen2.5:7b
 
 # 다운로드된 모델 파일 위치 확인
 # Mac: ~/.ollama/models/
@@ -180,7 +180,7 @@ open /Applications/Ollama.app
 
 # 모델 인식 확인
 ollama list
-# EEVE-Korean-10.8B-v1.0:Q4_K_M 이 목록에 있어야 함
+# qwen2.5:7b 가 목록에 있어야 함
 ```
 
 ### 2-6. 서버 실행 및 테스트

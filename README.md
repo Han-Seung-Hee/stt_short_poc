@@ -14,13 +14,13 @@
                     │       ▼                      │
                     │  ┌──────────────┐            │
                     │  │  STT Engine  │ mlx-whisper│
-                    │  │  (Metal GPU) │ (Mac)      │
+                    │  │(스테레오 분리)│ pydub      │
                     │  └──────┬───────┘            │
                     │         │ transcript          │
                     │         ▼                     │
                     │  ┌──────────────┐            │
                     │  │  LLM Engine  │ Ollama     │
-                    │  │  (3줄 요약)  │ REST API   │
+                    │  │  (3줄 요약)  │ qwen2.5:7b │
                     │  └──────┬───────┘            │
                     │         │ summary             │
                     │         ▼                     │
@@ -28,12 +28,19 @@
                     └─────────────────────────────┘
 ```
 
+
+## 관련 문서
+- `offline_setup_guide.md`: Mac 환경 (폐쇄망) 오프라인 설치 가이드
+- `linux_execution_guide.md`: 인터넷이 되는 Linux (테스트/운영 서버) 스펙 및 세팅 가이드
+- `linux_offline_setup_guide.md`: **[필독] 완전 폐쇄망(Air-Gapped) Linux 서버 수동 설치 가이드**
+- `architecture.drawio`: 시스템 아키텍처 다이어그램 (draw.io 파일)
+
 ## 빠른 시작
 
 ### 사전 요건
 - Python 3.11+
 - Ollama 실행 중 (`ollama serve`)
-- EEVE-Korean-10.8B 모델 로드 완료 (명령어: `ollama run jmpark333/eeve`)
+- Qwen2.5 7B 모델 로드 완료 (명령어: `ollama run qwen2.5:7b`)
 
 ### 설치 및 실행
 
@@ -60,7 +67,7 @@ python prepare_data.py MEN0005946
 
 **3. 백그라운드 LLM 실행 확인**
 *   로컬 Mac 환경에서 `Ollama` 애플리케이션이 실행 중인지 확인합니다. (상단 메뉴바 등)
-*   사용할 모델(`jmpark333/eeve` 등)이 이미 `ollama run`을 통해 로드 가능한 상태여야 합니다.
+*   사용할 모델(`qwen2.5:7b` 등)이 이미 `ollama run`을 통해 로드 가능한 상태여야 합니다.
 
 **4. STT + 요약 API 서버 시작**
 가상환경(`(.venv)`)이 활성화된 터미널에서 아래 명령어로 서버를 가동합니다.
@@ -112,7 +119,7 @@ curl -X POST http://localhost:8000/api/v1/process \
   "summary": "- 고객이 신용카드 한도 증액을 요청하셨습니다.\n- 상담사가 소득증빙 서류 제출이 필요하다고 안내하였습니다.\n- 고객이 3일 내 서류를 제출하기로 약속하셨습니다.",
   "model_info": {
     "stt": "mlx-whisper/small",
-    "llm": "jmpark333/eeve"
+    "llm": "qwen2.5:7b"
   },
   "processing_time": {
     "stt_sec": 12.34,
@@ -133,7 +140,7 @@ curl -X POST http://localhost:8000/api/v1/process \
 | `STT_MODEL_NAME` | Whisper 모델 크기 | `small` |
 | `STT_MODEL_PATH` | 로컬 모델 경로 | (자동) |
 | `STT_CHUNK_ENABLED` | 청크 분할 활성화 | `false` |
-| `LLM_MODEL_NAME` | Ollama 모델명 | `jmpark333/eeve` |
+| `LLM_MODEL_NAME` | Ollama 모델명 | `qwen2.5:7b` |
 | `LLM_TIMEOUT_SEC` | LLM 응답 타임아웃(초) | `120` |
 
 ## 메모리 관리 (16GB Unified Memory)
@@ -142,9 +149,9 @@ curl -X POST http://localhost:8000/api/v1/process \
 |------|-----------|
 | STT (small) 단독 | ~1GB |
 | STT (medium) 단독 | ~1.5GB |
-| LLM (10.8B-Q4) 단독 | ~7GB |
-| STT + LLM 동시 | ~8~10GB |
-| **16GB 여유분** | **~6~8GB** |
+| LLM (7B) 단독 | ~4.5GB |
+| STT + LLM 동시 | ~6GB |
+| **16GB 여유분** | **~10GB** |
 
 ### 최적화 팁
 - STT와 LLM은 **순차 처리**됩니다 (파이프라인 기본 동작)
@@ -154,18 +161,32 @@ curl -X POST http://localhost:8000/api/v1/process \
 
 ## Linux 서버 확장
 
-향후 GPU 없는 Linux 서버로 이전 시:
+향후 GPU 없는 저사양 Linux 서버 혹은 NVIDIA GPU가 장착된 고사양 서버로 이전 및 실행하는 구체적인 방법은 **`linux_execution_guide.md`** 문서를 참고하세요.
 
-1. `requirements.txt`에서 `mlx`, `mlx-whisper` 주석 처리 → `faster-whisper` 추가
-2. `config.yaml`에서 `stt.engine: "faster"` 로 변경
-3. CTranslate2 형식의 Whisper 모델로 교체
-4. Ollama Linux 버전 설치 (동일한 모델 사용 가능)
+> [!WARNING]
+> **폐쇄망(Air-Gapped) 리눅스 서버 배포 시 주의사항 (담당자 필독!!)**
+> 테스트 서버(Linux)가 외부 인터넷과 완전히 단선된 폐쇄망 서버실에 있을 경우, 절대 "알아서 환경 잡으세요"라고 하시면 안 됩니다. (`pip install` 1줄조차 무조건 에러납니다.)
+> 
+> 외부망(인터넷) PC에서 다음 파일들을 **USB에 사전에 차곡차곡 담아 들어가서 수동 설치(A to Z)** 해야 합니다.
+> - **Python 패키지 (사전 빌드 .whl)**
+> - **FFmpeg (정적 바이너리 타르)**
+> - **Ollama 실행 파일 (바이너리 다운로드본)**
+> - **LLM 모델 (qwen2.5:7b 통파일 아카이브)**
+> - **STT 모델 (faster-whisper CT2 로컬 폴더)**
+> 
+> 인프라 담당자와의 원활한 설치 협업을 위해, 상세한 다운로드 방법 명령어 및 수동 설치 커맨드를 명시한 **`linux_offline_setup_guide.md`** 문서를 작성해 두었으니 이 문서를 전달해 주시기 바랍니다.
+
+기본적으로(인터넷 연결 시)는 아래의 세 가지 스텝을 따릅니다:
+1. OS 환경에 `ffmpeg` 설치 및 `pip install faster-whisper`
+2. `config.yaml`에서 `stt.engine: "faster"` 로 변경 (NVIDIA GPU가 있다면 `stt.device: "cuda"` 추가)
+3. Ollama Linux 버전 설치 및 모델 풀(`ollama pull qwen2.5:7b`)
 
 ```yaml
 # config.yaml (Linux)
 stt:
   engine: "faster"
-  model_name: "small"
+  model_name: "small" # GPU 사용 시 large-v3 권장
+  device: "cpu"       # GPU 사용 시 "cuda"로 변경
   model_path: "/path/to/whisper-small-ct2"
 ```
 
@@ -188,5 +209,6 @@ stt_short/
 ├── config.yaml               # 설정 파일
 ├── requirements.txt          # Python 의존성
 ├── offline_setup_guide.md    # 오프라인 설치 가이드
+├── linux_execution_guide.md  # Linux 테스트 서버 실행 가이드
 └── README.md                 # 이 파일
 ```

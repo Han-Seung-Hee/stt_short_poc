@@ -109,6 +109,7 @@ class ProcessingPipeline:
                 language=lang,
                 chunk_enabled=use_chunk,
                 chunk_length_sec=chunk_sec,
+                speaker_separation=self.config.stt.speaker_separation,
             )
 
             result.transcript = stt_result.text

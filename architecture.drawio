@@ -1,0 +1,85 @@
+<mxfile host="Electron" modified="2026-02-28T13:00:00.000Z" agent="Mozilla/5.0" version="22.1.16" type="device">
+  <diagram id="stt-poc-architecture" name="Architecture">
+    <mxGraphModel dx="1290" dy="848" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        
+        <!-- Background Container -->
+        <mxCell id="container" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8fafc;strokeColor=#e2e8f0;dashed=1;dashPattern=1 2;" vertex="1" parent="1">
+          <mxGeometry x="120" y="80" width="560" height="440" as="geometry" />
+        </mxCell>
+        <mxCell id="container-label" value="FastAPI Server (PoC Environment, Air-gapped Mac)" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontStyle=1;fontColor=#64748b;" vertex="1" parent="1">
+          <mxGeometry x="140" y="90" width="300" height="30" as="geometry" />
+        </mxCell>
+
+        <!-- API Endpoint -->
+        <mxCell id="api-endpoint" value="POST /api/v1/process" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dbeafe;strokeColor=#2563eb;fontColor=#1e40af;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="320" y="140" width="160" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- User Input -->
+        <mxCell id="user-input" value="WAV Audio Upload&#10;(Stereo/Mono)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#f1f5f9;strokeColor=#64748b;fontColor=#1e293b;" vertex="1" parent="1">
+          <mxGeometry x="-40" y="120" width="120" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="edge1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="user-input" target="api-endpoint">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- STT Engine Block -->
+        <mxCell id="stt-engine" value="STT Engine&#10;(mlx-whisper)&#10;Metal GPU 가속" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fef08a;strokeColor=#ca8a04;fontColor=#854d0e;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="320" y="240" width="160" height="60" as="geometry" />
+        </mxCell>
+        
+        <!-- Pydub Block -->
+        <mxCell id="pydub-module" value="Speaker Separation&#10;(pydub - L/R Split)" style="shape=process;whiteSpace=wrap;html=1;backgroundOutline=1;fillColor=#ffedd5;strokeColor=#c2410c;fontColor=#9a3412;" vertex="1" parent="1">
+          <mxGeometry x="140" y="240" width="140" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Edges STT -->
+        <mxCell id="edge-api-stt" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="api-endpoint" target="stt-engine">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-stt-pydub" value="If Stereo" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=1;entryY=0.5;entryDx=0;entryDy=0;dashed=1" edge="1" parent="1" source="stt-engine" target="pydub-module">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-pydub-stt" value="Ch1, Ch2 WAV" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.25;entryY=1;entryDx=0;entryDy=0;dashed=1" edge="1" parent="1" source="pydub-module" target="stt-engine">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="210" y="320" />
+              <mxPoint x="360" y="320" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- LLM Block -->
+        <mxCell id="llm-engine" value="LLM Engine&#10;(Ollama REST API)&#10;qwen2.5:7b" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#bbf7d0;strokeColor=#16a34a;fontColor=#166534;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="320" y="360" width="160" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- STT to LLM edge -->
+        <mxCell id="edge-stt-llm" value="Transcript (화자 분리된 텍스트)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="stt-engine" target="llm-engine">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- JSON Response -->
+        <mxCell id="json-response" value="JSON Response&#10;{ transcript, summary }" style="shape=document;whiteSpace=wrap;html=1;boundedLbl=1;fillColor=#f3f4f6;strokeColor=#4b5563;fontColor=#1f2937;" vertex="1" parent="1">
+          <mxGeometry x="320" y="470" width="160" height="60" as="geometry" />
+        </mxCell>
+        
+        <!-- LLM to JSON edge -->
+        <mxCell id="edge-llm-json" value="3-Line Summary" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="llm-engine" target="json-response">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Client Output -->
+        <mxCell id="client-output" value="Web Dashboard&#10;(index.html)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#f1f5f9;strokeColor=#64748b;fontColor=#1e293b;" vertex="1" parent="1">
+          <mxGeometry x="-40" y="460" width="120" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-json-client" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="json-response" target="client-output">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

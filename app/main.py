@@ -65,6 +65,7 @@ def create_llm_engine(config: AppConfig) -> LLMEngine:
             model_name=config.llm.model_name,
             timeout_sec=config.llm.timeout_sec,
             max_retries=config.llm.max_retries,
+            prompt_type=config.llm.prompt_type,
         )
     else:
         raise ValueError(f"지원하지 않는 LLM 엔진: {engine_type}. 'ollama'를 사용하세요.")
@@ -270,6 +271,7 @@ async def transcribe_audio(
             language=language,
             chunk_enabled=use_chunk,
             chunk_length_sec=chunk_sec,
+            speaker_separation=config.stt.speaker_separation,
         )
 
         return {

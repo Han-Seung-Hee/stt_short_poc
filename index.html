@@ -247,6 +247,8 @@
             <div id="drop-area" class="upload-area" onclick="document.getElementById('file-input').click()">
                 <span class="upload-icon">📁</span>
                 <p id="file-name">클릭하거나 음성 파일(WAV)을 드래그하세요</p>
+                <p id="file-duration" class="upload-hint"
+                    style="color: var(--primary); font-weight: 600; margin-top: 4px;"></p>
                 <p class="upload-hint">지원 포맷: WAV (16kHz 권장)</p>
                 <input type="file" id="file-input" accept=".wav" style="display:none" onchange="handleFileSelect(this)">
             </div>
@@ -268,6 +270,9 @@
                 <div class="result-panel">
                     <div class="panel-label">💬 인식된 텍스트 원문 (Transcript)</div>
                     <div id="transcript-content" class="content-area">분석을 시작하면 여기에 텍스트가 표시됩니다.</div>
+                    <div
+                        style="font-size: 0.75rem; color: var(--text-muted); text-align: right; margin-top: -8px; padding-right: 4px;">
+                        * 인식된 텍스트 전문은 일부 오탈자가 존재할 수 있습니다.</div>
                 </div>
                 <div class="result-panel">
                     <div class="panel-label">✨ 핵심 3줄 요약 (Summary)</div>
@@ -307,6 +312,18 @@
             if (input.files && input.files[0]) {
                 selectedFile = input.files[0];
                 document.getElementById('file-name').innerText = selectedFile.name;
+
+                // 음성 파일 길이 추출 로직
+                const audio = new Audio(URL.createObjectURL(selectedFile));
+                audio.onloadedmetadata = function () {
+                    const duration = audio.duration;
+                    const minutes = Math.floor(duration / 60);
+                    const seconds = Math.floor(duration % 60);
+                    document.getElementById('file-duration').innerText = `총 음성 길이: ${minutes}분 ${seconds}초`;
+                    // 메모리 누수 방지
+                    URL.revokeObjectURL(audio.src);
+                };
+
                 document.getElementById('start-btn').disabled = false;
             }
         }

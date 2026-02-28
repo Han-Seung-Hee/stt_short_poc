@@ -8,7 +8,7 @@
 |------|-----|
 | 타겟 HW | Apple M1 Mac, 16GB Unified Memory |
 | STT | `mlx-whisper` (Whisper `small` 모델, ~462MB) |
-| LLM | Ollama + `EEVE-Korean-10.8B-Q4_K_M` (~6.7GB) |
+| LLM | Ollama + `qwen2.5:7b` (~4.7GB) |
 | API | FastAPI + Uvicorn |
 | 음성 입력 | WAV, 5분 이내, 16kHz mono 가정 |
 | 청크 분할 | 옵션 (ON/OFF, 기본 OFF) |
@@ -116,7 +116,7 @@ stt:
 llm:
   engine: "ollama"
   base_url: "http://localhost:11434"
-  model_name: "EEVE-Korean-10.8B-v1.0:Q4_K_M"
+  model_name: "qwen2.5:7b"
   timeout_sec: 120
 server:
   host: "0.0.0.0"

@@ -39,6 +39,7 @@ class STTEngine(ABC):
         language: str = "ko",
         chunk_enabled: bool = False,
         chunk_length_sec: int = 300,
+        speaker_separation: bool = False,
     ) -> STTResult:
         """음성 파일을 텍스트로 변환합니다.
 
@@ -47,6 +48,7 @@ class STTEngine(ABC):
             language: 인식 언어 코드 (기본: "ko").
             chunk_enabled: 청크 분할 처리 여부.
             chunk_length_sec: 청크 단위 길이(초). 기본 300초(5분).
+            speaker_separation: 스테레오 화자 분리 여부.
 
         Returns:
             STTResult: 인식 결과.

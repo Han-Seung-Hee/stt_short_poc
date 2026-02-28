@@ -65,6 +65,7 @@ class MLXWhisperEngine(STTEngine):
         language: str = "ko",
         chunk_enabled: bool = False,
         chunk_length_sec: int = 300,
+        speaker_separation: bool = False,
     ) -> STTResult:
         """음성 파일을 텍스트로 변환합니다.
 
@@ -73,6 +74,7 @@ class MLXWhisperEngine(STTEngine):
             language: 인식 언어 코드.
             chunk_enabled: 청크 분할 처리 여부.
             chunk_length_sec: 청크 단위 길이(초).
+            speaker_separation: 스테레오 기반 화자 분리 여부.
 
         Returns:
             STTResult: 인식 결과.
@@ -84,13 +86,68 @@ class MLXWhisperEngine(STTEngine):
             raise FileNotFoundError(f"오디오 파일을 찾을 수 없습니다: {audio_path}")
 
         start_time = time.time()
+        
+        is_stereo_separated = False
 
-        if chunk_enabled:
-            result = self._transcribe_chunked(
-                audio_path, language, chunk_length_sec
+        if speaker_separation:
+            from pydub import AudioSegment
+            audio_info = AudioSegment.from_wav(audio_path)
+            if audio_info.channels == 2:
+                is_stereo_separated = True
+            else:
+                logger.warning("스테레오 분리 옵션이 켜져 있으나, 음성이 모노입니다. 기본 모드로 진행합니다.")
+
+        if is_stereo_separated:
+            from pydub import AudioSegment
+            logger.info("============== 스테레오 화자 분리 모드로 인식 시작 ==============")
+            audio = AudioSegment.from_wav(audio_path)
+            left, right = audio.split_to_mono()
+            
+            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_l, \
+                 tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_r:
+                 
+                left.export(tmp_l.name, format="wav")
+                right.export(tmp_r.name, format="wav")
+                
+                logger.info("[진행중] 상담사 (채널 1 - Left) STT 분석 중...")
+                if chunk_enabled:
+                    res_left = self._transcribe_chunked(tmp_l.name, language, chunk_length_sec)
+                else:
+                    res_left = self._transcribe_single(tmp_l.name, language)
+                    
+                logger.info("[진행중] 고객 (채널 2 - Right) STT 분석 중...")
+                if chunk_enabled:
+                    res_right = self._transcribe_chunked(tmp_r.name, language, chunk_length_sec)
+                else:
+                    res_right = self._transcribe_single(tmp_r.name, language)
+                    
+            Path(tmp_l.name).unlink(missing_ok=True)
+            Path(tmp_r.name).unlink(missing_ok=True)
+            
+            all_segments = []
+            for seg in res_left.segments:
+                seg.text = f"상담사: {seg.text}"
+                all_segments.append(seg)
+            for seg in res_right.segments:
+                seg.text = f"고객: {seg.text}"
+                all_segments.append(seg)
+                
+            all_segments.sort(key=lambda x: x.start)
+            formatted_text = "\\n".join([seg.text for seg in all_segments])
+            
+            result = STTResult(
+                text=formatted_text,
+                segments=all_segments,
+                language=language,
             )
+            logger.info("============== 스테레오 화자 분리 완료 ==============")
         else:
-            result = self._transcribe_single(audio_path, language)
+            if chunk_enabled:
+                result = self._transcribe_chunked(
+                    audio_path, language, chunk_length_sec
+                )
+            else:
+                result = self._transcribe_single(audio_path, language)
 
         elapsed = time.time() - start_time
         result.duration_sec = elapsed

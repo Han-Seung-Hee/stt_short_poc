@@ -27,6 +27,7 @@ class STTConfig:
     model_path: Optional[str] = None  # 로컬 모델 경로 (None이면 기본 경로)
     language: str = "ko"
     chunk: STTChunkConfig = field(default_factory=STTChunkConfig)
+    speaker_separation: bool = False  # 스테레오 채널 분리 화자 인식
 
 
 @dataclass
@@ -34,10 +35,11 @@ class LLMConfig:
     """LLM 엔진 설정."""
     engine: str = "ollama"
     base_url: str = "http://localhost:11434"
-    model_name: str = "EEVE-Korean-10.8B-v1.0:Q4_K_M"
+    model_name: str = "qwen2.5:7b"
     timeout_sec: int = 120
     max_retries: int = 2
     refine_enabled: bool = False  # 빠른 요약을 위해 기본값 False
+    prompt_type: str = "default"  # "default" | "few_shot"
 
 
 @dataclass
