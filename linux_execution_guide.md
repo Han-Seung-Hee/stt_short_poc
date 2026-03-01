@@ -88,10 +88,10 @@ ollama pull qwen2.5:7b
 
 ```bash
 # FastAPI 서버 시작
-uvicorn app.main:app --host 0.0.0.0 --port 8000
+uvicorn app.main:app --host 0.0.0.0 --port 9123
 ```
 
-방화벽(UFW 등)이 있다면 8000번 포트를 열어주시고, 브라우저에서 `http://서버IP:8000/index.html`로 접속하면 Mac에서 보셨던 것과 100% 동일한 화면과 기능을 사용하실 수 있습니다!
+방화벽(UFW 등)이 있다면 9123번 포트를 열어주시고, 브라우저에서 `http://서버IP:9123/`로 접속하면 Mac에서 보셨던 것과 100% 동일한 화면과 기능을 사용하실 수 있습니다!
 
 ---
 

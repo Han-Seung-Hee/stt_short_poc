@@ -46,7 +46,7 @@ class LLMConfig:
 class ServerConfig:
     """서버 설정."""
     host: str = "0.0.0.0"
-    port: int = 8000
+    port: int = 9123
     max_file_size_mb: int = 100
 
 

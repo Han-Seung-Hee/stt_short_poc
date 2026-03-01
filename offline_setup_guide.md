@@ -193,27 +193,26 @@ source .venv/bin/activate
 python -m app.main
 
 # 또는
-uvicorn app.main:app --host 0.0.0.0 --port 8000
+uvicorn app.main:app --host 0.0.0.0 --port 9123
 
 # --- 다른 터미널에서 테스트 ---
 
 # 헬스체크
-curl http://localhost:8000/api/v1/health
+curl http://localhost:9123/api/v1/health
 
-# STT + 요약 통합 테스트
-curl -X POST http://localhost:8000/api/v1/process \
-  -F "file=@test_audio.wav" \
+# STT + 요약 파이프라인 전송 (가장 대표적인 API)
+curl -X POST http://localhost:9123/api/v1/process \
+  -F "file=@test1.wav" \
   -F "language=ko" \
   -F "chunk_enabled=false"
 
-# STT만 테스트
-curl -X POST http://localhost:8000/api/v1/transcribe \
-  -F "file=@test_audio.wav"
+# STT만 단독 요청 시
+curl -X POST http://localhost:9123/api/v1/transcribe \
+  -F "file=@test1.wav"
 
-# 요약만 테스트 (STT 없이)
-curl -X POST http://localhost:8000/api/v1/summarize \
-  -F "text=고객이 신용카드 한도 증액을 요청했습니다. 상담사는 소득증빙 서류 제출이 필요하다고 안내했습니다. 고객은 3일 내 서류를 제출하기로 했습니다."
-```
+# 텍스트 넘겨서 요약만 단독 요청 시
+curl -X POST http://localhost:9123/api/v1/summarize \
+  -F "text=상담내용..."고객이 신용카드 한도 증액을 요청했습니다. 상담사는 소득증빙 서류 제출이 필요하다고 안내했습니다. 고객은 3일 내 서류를 제출하기로 했습니다."
 
 ---
 

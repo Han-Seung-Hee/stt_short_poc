@@ -9,13 +9,21 @@
 
 import logging
 import os
+
+@app.get("/")
+async def serve_index():
+    """웹 브라우저 접속 시 프론트엔드(index.html)를 반환합니다."""
+    index_path = Path(__file__).parent.parent / "index.html"
+    if index_path.exists():
+        return FileResponse(str(index_path))
+    return JSONResponse(status_code=404, content={"message": "index.html 파일이 없습니다."})
 import tempfile
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_config, AppConfig

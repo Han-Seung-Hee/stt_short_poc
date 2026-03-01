@@ -18,7 +18,7 @@
 ```
                     ┌────────────────────────────-─┐
                     │       FastAPI Server         │
-                    │       (port 8000)            │
+                    │       (port 9123)            │
                     │                              │
   WAV Upload ─────▶ │  POST /api/v1/process        │
                     │       │                      │
@@ -44,6 +44,7 @@
 - `offline_setup_guide.md`: Mac 환경 (폐쇄망) 오프라인 설치 가이드
 - `linux_execution_guide.md`: 인터넷이 되는 Linux (테스트/운영 서버) 스펙 및 세팅 가이드
 - `linux_offline_setup_guide.md`: **[필독] 완전 폐쇄망(Air-Gapped) Linux 서버 수동 설치 가이드**
+- `java_call_guide.md`: 외부 시스템(Java/Spring Boot) 타임아웃 및 API 연동 가이드
 - `architecture.drawio`: 시스템 아키텍처 다이어그램 (draw.io 파일)
 
 ## 빠른 시작
@@ -83,7 +84,7 @@ python prepare_data.py MEN0005946
 **4. STT + 요약 API 서버 시작**
 가상환경(`(.venv)`)이 활성화된 터미널에서 아래 명령어로 서버를 가동합니다.
 ```bash
-kill -9 $(lsof -t -i:8080) 2>/dev/null; .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8080
+kill -9 $(lsof -t -i:9123) 2>/dev/null; .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 9123
 ```
 *`Application startup complete.` 문구가 뜨면 서버 가동 완료입니다.*
 
@@ -95,23 +96,38 @@ open index.html
 
 ```bash
 # 헬스체크
-curl http://localhost:8000/api/v1/health
+curl http://localhost:9123/api/v1/health
+```
 
-# STT + 요약 통합
-curl -X POST http://localhost:8000/api/v1/process \
-  -F "file=@sample.wav" \
+- **통합 프로세스 (WAV → STT + 3줄 요약)**
+```bash
+curl -X POST http://localhost:9123/api/v1/process \
+  -H "accept: application/json" \
+  -H "Content-Type: multipart/form-data" \
+  -F "file=@test1.wav" \
   -F "language=ko"
+```
 
-# STT만
-curl -X POST http://localhost:8000/api/v1/transcribe \
-  -F "file=@sample.wav"
+- **STT 전용 (음성 → 텍스트만 추출)**
+```bash
+curl -X POST http://localhost:9123/api/v1/transcribe \
+  -H "accept: application/json" \
+  -H "Content-Type: multipart/form-data" \
+  -F "file=@test1.wav" \
+  -F "language=ko"
+```
 
-# 요약만
-curl -X POST http://localhost:8000/api/v1/summarize \
-  -F "text=상담 내용 텍스트..."
+- **LLM 전용 (텍스트 → 3줄 요약만)**
+```bash
+curl -X POST http://localhost:9123/api/v1/summarize \
+  -H "accept: application/json" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "text=여기에 분석할 긴 텍스트를 입력하세요. 고객 불만 사항 등..."
+```
 
-# 청크 분할 활성화 (긴 음성)
-curl -X POST http://localhost:8000/api/v1/process \
+*(선택)* 서버가 실행 상태일때 `chunk` 기반 처리를 하고 싶다면 API 요청 시 옵션을 주면 됩니다:
+```bash
+curl -X POST http://localhost:9123/api/v1/process \
   -F "file=@long_audio.wav" \
   -F "chunk_enabled=true" \
   -F "chunk_length_sec=300"
@@ -221,5 +237,7 @@ stt_short/
 ├── requirements.txt          # Python 의존성
 ├── offline_setup_guide.md    # 오프라인 설치 가이드
 ├── linux_execution_guide.md  # Linux 테스트 서버 실행 가이드
+├── linux_offline_setup_guide.md # 완전 폐쇄망 수동 설치 가이드
+├── java_call_guide.md        # 백엔드(Java/Spring) 연동 가이드
 └── README.md                 # 이 파일
 ```
