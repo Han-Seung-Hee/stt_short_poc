@@ -94,6 +94,18 @@ kill -9 $(lsof -t -i:9123) 2>/dev/null; .venv/bin/uvicorn app.main:app --host 0.
 open index.html
 ```
 
+**6. 외부 접속 (스마트폰 등) 허용하기 (선택)**
+내 컴퓨터(Mac)에서 띄운 개발 서버를 외부망(다른 사람의 PC나 스마트폰)에서 접속하여 데모를 진행하고 싶다면, `ngrok` 같은 로컬 터널링 도구를 사용해 임시 공인 URL을 발급받을 수 있습니다.
+새 터미널 탭을 열고 아래 명령어를 실행하세요.
+```bash
+# ngrok 설치 (Mac)
+brew install ngrok/ngrok/ngrok
+
+# 외부 접속용 임시 터널링 URL 발급 (9123 포트 연동)
+ngrok http 9123
+```
+*명령어 실행 후 터미널에 표시되는 `Forwarding    https://xxxx-xxx.ngrok.app -> http://localhost:9123` 주소를 복사하여 다른 기기의 브라우저나 `index.html` 소스 코드의 API 호출 주소로 사용하시면 됩니다.*
+
 ```bash
 # 헬스체크
 curl http://localhost:9123/api/v1/health

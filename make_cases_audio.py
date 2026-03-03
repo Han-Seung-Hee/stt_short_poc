@@ -100,5 +100,11 @@ async def main():
                        agent_voice=VOICE_MALE_2, 
                        customer_voice=VOICE_FEMALE_1)
 
+    # 5. 남 / 남 (Hyunsu / InJoon - 격양된 톤)
+    await process_case("test_ready/script/custom/sc_case_5.txt", 
+                       agent_voice=VOICE_MALE_2, 
+                       customer_voice=VOICE_MALE_1,
+                       customer_rate="+10%")
+
 if __name__ == "__main__":
     asyncio.run(main())
