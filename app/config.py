@@ -26,6 +26,7 @@ class STTConfig:
     model_name: str = "small"      # tiny, base, small, medium, large-v3
     model_path: Optional[str] = None  # 로컬 모델 경로 (None이면 기본 경로)
     language: str = "ko"
+    device: str = "cpu"            # "cpu" | "cuda" (Linux Faster-Whisper용)
     chunk: STTChunkConfig = field(default_factory=STTChunkConfig)
     speaker_separation: bool = False  # 스테레오 채널 분리 화자 인식
 

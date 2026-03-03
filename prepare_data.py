@@ -65,43 +65,66 @@ def merge_aihub_data(base_dir: str, conversation_id: str, output_dir: str):
     logging.info(f"==== 파싱 시작: {conversation_id} ====")
     logging.info(f"WAV 파일 {len(wav_files)}개, JSON 파일 {len(json_files)}개 로드 완료")
     
+    json_dict = {f.stem: f for f in json_files}
+    
+    # A(상담사)와 B(고객) 파일 개수를 세어 비율(비례) 정렬을 위한 기준값 마련
+    counts = {"A": 0, "B": 0}
+    for w in wav_files:
+        if "A" in w.stem: counts["A"] += 1
+        elif "B" in w.stem: counts["B"] += 1
+        
+    def sort_key(w_path):
+        stem = w_path.stem
+        seq = int(stem[-3:]) if stem[-3:].isdigit() else 999
+        
+        # 전체 길이 대비 현재 문장의 비율 위치(0.0 ~ 1.0)를 계산하여
+        # 대화가 한쪽으로 몰리지 않고 끝까지 자연스럽게 핑퐁(교차)되도록 비율 기반 정렬
+        is_a = "A" in stem
+        speaker = "A" if is_a else "B"
+        max_count = counts[speaker] if counts[speaker] > 0 else 1
+        
+        ratio = seq / max_count
+        speaker_order = 1 if is_a else 0 # 같은 비율 시 B(고객)가 우선
+        return (ratio, speaker_order, seq)
+        
+    wav_files.sort(key=sort_key)
+    
     merged_audio = AudioSegment.empty()
     ground_truth_lines = []
-    
-    # JSON 파일들을 파일 이름(확장자 제외) 기준으로 매핑
-    json_dict = {f.stem: f for f in json_files}
     
     for w_file in wav_files:
         stem = w_file.stem
         
-        # Audio 병합 (파일명의 화자 정보를 바탕으로 좌/우 스테레오 분리 적용)
         audio_segment = AudioSegment.from_wav(str(w_file))
         
-        # 파일명을 '_'로 분리하여 'A' 또는 'B' 식별 (예: HOS0004195_A_001.wav)
-        parts = stem.split("_")
-        if "A" in parts:
-            panned_segment = audio_segment.pan(-1.0) # A(상담원): 왼쪽 스피커
-        elif "B" in parts:
-            panned_segment = audio_segment.pan(1.0)  # B(고객): 오른쪽 스피커
+        # AI Hub 파일명 형식
+        if "A" in stem:
+            panned_segment = AudioSegment.silent(duration=len(audio_segment)).overlay(audio_segment, position=0).pan(-1.0)
+        elif "B" in stem:
+            panned_segment = AudioSegment.silent(duration=len(audio_segment)).overlay(audio_segment, position=0).pan(1.0)
         else:
-            panned_segment = audio_segment.pan(0.0)  # 식별 불가 시 중앙
+            panned_segment = audio_segment.pan(0.0)
             
+        # 순차적으로 단순 이어붙이기 (앞뒤 약간의 공백/재생시간 보존)
         merged_audio += panned_segment
         
-        # 대응되는 JSON에서 텍스트(정답)와 화자 정보 추출
-        j_file = json_dict.get(stem)
-        if j_file and j_file.exists():
-            with open(j_file, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                info = data.get("info", [{}])[0].get("metadata", {})
-                speaker_type = info.get("speaker_type", "알수없음") # 고객 or 상담사
-                
-                texts = data.get("inputText", [])
-                text_content = " ".join([t.get("orgtext", "") for t in texts])
-                
-                ground_truth_lines.append(f"[{speaker_type}] {text_content}")
-        else:
-            ground_truth_lines.append(f"[알수없음] ({stem} 라벨링 매칭 실패)")
+        # 라벨링 대본 추가
+        if label_dir:
+            j_file = json_dict.get(stem)
+            if j_file and j_file.exists():
+                with open(j_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    info = data.get("info", [{}])[0].get("metadata", {})
+                    speaker_type = info.get("speaker_type", "알수없음")
+                    
+                    texts = data.get("inputText", [])
+                    text_content = " ".join([t.get("orgtext", "") for t in texts])
+                    
+                    ground_truth_lines.append(f"[{speaker_type}] {text_content}")
+            else:
+                ground_truth_lines.append(f"[알수없음] ({stem} 라벨링 매칭 실패)")
+
+
             
     # 결과물 저장용 폴더 생성
     out_path = Path(output_dir)
@@ -114,13 +137,17 @@ def merge_aihub_data(base_dir: str, conversation_id: str, output_dir: str):
     logging.info(f"오디오 파일 병합 및 저장 중... (총 {len(merged_audio)/1000:.1f}초 분량)")
     merged_audio.export(out_wav, format="wav")
     
-    # 텍스트 내보내기
-    with open(out_txt, "w", encoding="utf-8") as f:
-        f.write("\n".join(ground_truth_lines))
+    # 텍스트 내보내기 (라벨링 데이터가 있을 때만)
+    if label_dir and ground_truth_lines:
+        with open(out_txt, "w", encoding="utf-8") as f:
+            f.write("\n".join(ground_truth_lines))
         
     logging.info(f"==== 처리 완료! ====")
     logging.info(f" 🎧 업로드용 테스트 오디오: {out_wav}")
-    logging.info(f" 📄 원본 비교용 대본(정답지): {out_txt}")
+    if label_dir:
+        logging.info(f" 📄 원본 비교용 대본(정답지): {out_txt}")
+    else:
+        logging.info(" 📄 원본 비교용 대본(정답지): 라벨링 데이터가 없어 파일이 생성되지 않았습니다.")
 
 
 if __name__ == "__main__":

@@ -9,14 +9,6 @@
 
 import logging
 import os
-
-@app.get("/")
-async def serve_index():
-    """웹 브라우저 접속 시 프론트엔드(index.html)를 반환합니다."""
-    index_path = Path(__file__).parent.parent / "index.html"
-    if index_path.exists():
-        return FileResponse(str(index_path))
-    return JSONResponse(status_code=404, content={"message": "index.html 파일이 없습니다."})
 import tempfile
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -191,6 +183,20 @@ async def _save_upload_to_temp(file: UploadFile) -> str:
 
 # === 엔드포인트 ===
 
+@app.get("/")
+async def serve_index():
+    """웹 브라우저 접속 시 프론트엔드(index.html)를 반환합니다."""
+    index_path = Path(__file__).parent.parent / "index.html"
+    if index_path.exists():
+        return FileResponse(str(index_path))
+    return JSONResponse(status_code=404, content={"message": "index.html 파일이 없습니다."})
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    """브라우저의 불필요한 favicon 404 에러를 방지합니다."""
+    return JSONResponse(status_code=204, content=None)
+
 @app.get("/api/v1/health")
 async def health_check():
     """서버 및 엔진 상태를 확인합니다."""
@@ -219,6 +225,7 @@ async def process_audio(
     language: str = Form(default="ko", description="언어 코드"),
     chunk_enabled: Optional[bool] = Form(default=None, description="청크 분할 활성화 여부"),
     chunk_length_sec: Optional[int] = Form(default=None, description="청크 길이(초)"),
+    speaker_separation: Optional[bool] = Form(default=None, description="스테레오 화자 분리 여부"),
 ):
     """WAV 파일을 STT + 요약까지 통합 처리합니다.
 
@@ -240,6 +247,7 @@ async def process_audio(
             language=language,
             chunk_enabled=chunk_enabled,
             chunk_length_sec=chunk_length_sec,
+            speaker_separation=speaker_separation,
         )
 
         status_code = 200 if result.status == "success" else 207  # 207 = partial

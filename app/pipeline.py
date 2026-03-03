@@ -13,6 +13,7 @@ from typing import Optional
 from app.config import AppConfig
 from app.stt.base import STTEngine, STTResult
 from app.llm.base import LLMEngine, SummaryResult
+import korcen.korcen as kc
 
 logger = logging.getLogger(__name__)
 
@@ -35,21 +36,38 @@ class PipelineResult:
     total_duration_sec: float = 0.0
     status: str = "success"
     error: Optional[str] = None
+    
+    # 비속어 검출 정보
+    profanity_info: dict = field(default_factory=lambda: {
+        "customer_detected": False,
+        "agent_detected": False,
+        "customer_sentences": [],
+        "agent_sentences": []
+    })
 
     def to_dict(self) -> dict:
         """API 응답용 딕셔너리로 변환합니다."""
+        import json
+        summary_obj = self.summary
+        if isinstance(self.summary, str) and self.summary.strip().startswith("{"):
+            try:
+                summary_obj = json.loads(self.summary)
+            except Exception:
+                pass
+
         return {
             "status": self.status,
             "transcript": self.transcript,
             "segments": [
-                {"start": s.start, "end": s.end, "text": s.text}
+                {"start": s.start, "end": s.end, "text": s.text, "is_profane": getattr(s, "is_profane", False)}
                 for s in self.segments
             ],
-            "summary": self.summary,
+            "summary": summary_obj,
             "model_info": {
                 "stt": self.stt_model,
                 "llm": self.llm_model,
             },
+            "profanity_info": self.profanity_info,
             "processing_time": {
                 "stt_sec": round(self.stt_duration_sec, 2),
                 "llm_sec": round(self.llm_duration_sec, 2),
@@ -78,6 +96,7 @@ class ProcessingPipeline:
         language: Optional[str] = None,
         chunk_enabled: Optional[bool] = None,
         chunk_length_sec: Optional[int] = None,
+        speaker_separation: Optional[bool] = None,
         system_prompt: Optional[str] = None,
     ) -> PipelineResult:
         """WAV 파일을 STT → 요약까지 처리합니다.
@@ -99,23 +118,40 @@ class ProcessingPipeline:
         lang = language or self.config.stt.language
         use_chunk = chunk_enabled if chunk_enabled is not None else self.config.stt.chunk.enabled
         chunk_sec = chunk_length_sec or self.config.stt.chunk.length_sec
+        use_speaker_separation = speaker_separation if speaker_separation is not None else self.config.stt.speaker_separation
 
         # === 1단계: STT ===
         try:
-            logger.info(f"=== STT 시작: {audio_path} (lang={lang}, chunk={use_chunk}) ===")
+            logger.info(f"=== STT 시작: {audio_path} (lang={lang}, chunk={use_chunk}, sep={use_speaker_separation}) ===")
 
             stt_result: STTResult = self.stt_engine.transcribe(
                 audio_path=audio_path,
                 language=lang,
                 chunk_enabled=use_chunk,
                 chunk_length_sec=chunk_sec,
-                speaker_separation=self.config.stt.speaker_separation,
+                speaker_separation=use_speaker_separation,
             )
 
             result.transcript = stt_result.text
             result.segments = stt_result.segments
             result.stt_model = stt_result.model_name
             result.stt_duration_sec = stt_result.duration_sec
+            
+            # 비속어 검출 로직 추가
+            for s in result.segments:
+                seg_text = s.text.strip()
+                s.is_profane = kc.check(seg_text)
+                if s.is_profane:
+                    if "고객:" in seg_text:
+                        result.profanity_info["customer_detected"] = True
+                        result.profanity_info["customer_sentences"].append(seg_text)
+                    elif "상담사:" in seg_text:
+                        result.profanity_info["agent_detected"] = True
+                        result.profanity_info["agent_sentences"].append(seg_text)
+                    else:
+                        # 발화자 구분이 없는 경우 고객으로 간주 (또는 둘 다 아닐 수 있음)
+                        result.profanity_info["customer_detected"] = True
+                        result.profanity_info["customer_sentences"].append(seg_text)
 
             logger.info(f"STT 완료: {len(stt_result.text)}자 인식")
 

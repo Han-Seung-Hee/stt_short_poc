@@ -97,37 +97,31 @@ class FasterWhisperEngine(STTEngine):
 
         if is_stereo_separated:
             from pydub import AudioSegment
-            logger.info("============== 스테레오 화자 분리 모드로 인식 시작 (Linux CPU) ==============")
+            logger.info("============== 스테레오 화자 분리 모드로 인식 시작 (혼합 STT 후 에너지 기반 분리, Linux CPU) ==============")
             audio = AudioSegment.from_wav(audio_path)
             left, right = audio.split_to_mono()
             
-            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_l, \
-                 tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_r:
-                 
-                left.export(tmp_l.name, format="wav")
-                right.export(tmp_r.name, format="wav")
-                
-                logger.info("[진행중] 상담사 (채널 1 - Left) STT 분석 중...")
-                segs_left = _transcribe_file(tmp_l.name)
-                for seg in segs_left:
-                    seg.text = f"상담사: {seg.text}"
-                    
-                logger.info("[진행중] 고객 (채널 2 - Right) STT 분석 중...")
-                segs_right = _transcribe_file(tmp_r.name)
-                for seg in segs_right:
-                    seg.text = f"고객: {seg.text}"
-                    
-            Path(tmp_l.name).unlink(missing_ok=True)
-            Path(tmp_r.name).unlink(missing_ok=True)
+            # 1. 원본 믹스본을 통해 시계열 유지 통 STT
+            all_segments = _transcribe_file(audio_path)
             
-            all_segments = segs_left + segs_right
-            all_segments.sort(key=lambda x: x.start)
+            # 2. RMS 비교로 화자 분리
+            for seg in all_segments:
+                start_ms = int(seg.start * 1000)
+                end_ms = int(seg.end * 1000)
+                
+                chunk_l = left[start_ms:end_ms]
+                chunk_r = right[start_ms:end_ms]
+                
+                if chunk_l.rms > chunk_r.rms:
+                    seg.text = f"상담사: {seg.text}"
+                else:
+                    seg.text = f"고객: {seg.text}"
         else:
             all_segments = _transcribe_file(audio_path)
 
         elapsed = time.time() - start_time
         
-        formatted_text = "\\n".join([seg.text for seg in all_segments])
+        formatted_text = "\n".join([seg.text for seg in all_segments])
 
         return STTResult(
             text=formatted_text,

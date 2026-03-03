@@ -99,47 +99,36 @@ class MLXWhisperEngine(STTEngine):
 
         if is_stereo_separated:
             from pydub import AudioSegment
-            logger.info("============== 스테레오 화자 분리 모드로 인식 시작 ==============")
+            logger.info("============== 스테레오 화자 분리 모드로 인식 시작 (혼합 STT 후 에너지 기반 분리) ==============")
             audio = AudioSegment.from_wav(audio_path)
             left, right = audio.split_to_mono()
             
-            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_l, \
-                 tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_r:
-                 
-                left.export(tmp_l.name, format="wav")
-                right.export(tmp_r.name, format="wav")
+            # 1. 믹스(혹은 원본 스테레오 그대로)로 STT 수행 (시계열 보존)
+            if chunk_enabled:
+                result = self._transcribe_chunked(audio_path, language, chunk_length_sec)
+            else:
+                result = self._transcribe_single(audio_path, language)
                 
-                logger.info("[진행중] 상담사 (채널 1 - Left) STT 분석 중...")
-                if chunk_enabled:
-                    res_left = self._transcribe_chunked(tmp_l.name, language, chunk_length_sec)
-                else:
-                    res_left = self._transcribe_single(tmp_l.name, language)
-                    
-                logger.info("[진행중] 고객 (채널 2 - Right) STT 분석 중...")
-                if chunk_enabled:
-                    res_right = self._transcribe_chunked(tmp_r.name, language, chunk_length_sec)
-                else:
-                    res_right = self._transcribe_single(tmp_r.name, language)
-                    
-            Path(tmp_l.name).unlink(missing_ok=True)
-            Path(tmp_r.name).unlink(missing_ok=True)
-            
+            # 2. 결과 세그먼트를 순회하며 left/right 채널 음압(RMS) 비교하여 화자 태깅
             all_segments = []
-            for seg in res_left.segments:
-                seg.text = f"상담사: {seg.text}"
-                all_segments.append(seg)
-            for seg in res_right.segments:
-                seg.text = f"고객: {seg.text}"
+            for seg in result.segments:
+                start_ms = int(seg.start * 1000)
+                end_ms = int(seg.end * 1000)
+                
+                # 해당 밀리초 구간 자르기
+                chunk_l = left[start_ms:end_ms]
+                chunk_r = right[start_ms:end_ms]
+                
+                if chunk_l.rms > chunk_r.rms:
+                    seg.text = f"상담사: {seg.text}"
+                else:
+                    seg.text = f"고객: {seg.text}"
+                    
                 all_segments.append(seg)
                 
-            all_segments.sort(key=lambda x: x.start)
-            formatted_text = "\\n".join([seg.text for seg in all_segments])
-            
-            result = STTResult(
-                text=formatted_text,
-                segments=all_segments,
-                language=language,
-            )
+            formatted_text = "\n".join([seg.text for seg in all_segments])
+            result.text = formatted_text
+            result.segments = all_segments
             logger.info("============== 스테레오 화자 분리 완료 ==============")
         else:
             if chunk_enabled:

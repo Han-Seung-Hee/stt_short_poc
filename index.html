@@ -233,6 +233,65 @@
         .disclaimer strong {
             color: #475569;
         }
+
+        /* 채팅 UI 스타일 추가 */
+        .chat-container {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .chat-bubble {
+            max-width: 85%;
+            padding: 12px 16px;
+            border-radius: 12px;
+            position: relative;
+            font-size: 0.9375rem;
+            line-height: 1.5;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        }
+
+        .chat-speaker {
+            font-size: 0.75rem;
+            font-weight: 700;
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .chat-time {
+            color: #94a3b8;
+            font-weight: 400;
+            font-size: 0.7rem;
+        }
+
+        .chat-bubble.agent {
+            align-self: flex-start;
+            background-color: #ffffff;
+            border-top-left-radius: 4px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .chat-bubble.agent .chat-speaker {
+            color: #3b82f6;
+        }
+
+        .chat-bubble.customer {
+            align-self: flex-end;
+            background-color: #dcf8c6;
+            border-top-right-radius: 4px;
+            border: 1px solid #bbf7d0;
+        }
+
+        .chat-bubble.customer .chat-speaker {
+            color: #16a34a;
+            flex-direction: row-reverse;
+        }
+
+        .chat-bubble.customer .chat-text {
+            text-align: right;
+        }
     </style>
 </head>
 
@@ -275,8 +334,27 @@
                         * 인식된 텍스트 전문은 일부 오탈자가 존재할 수 있습니다.</div>
                 </div>
                 <div class="result-panel">
-                    <div class="panel-label">✨ 핵심 3줄 요약 (Summary)</div>
+                    <div class="panel-label">✨ 전체 요약 & 3줄 요약 (Summary)</div>
                     <div id="summary-content" class="content-area">요약 결과가 여기에 표시됩니다.</div>
+                </div>
+            </div>
+
+            <div id="profanity-info"
+                style="display:none; margin-top: 24px; padding: 16px; background-color: #fee2e2; border: 1px solid #fca5a5; border-radius: 8px;">
+                <h3
+                    style="color: #b91c1c; margin-top: 0; margin-bottom: 12px; font-size: 1.1rem; display: flex; align-items: center; gap: 6px;">
+                    ⚠️ 대화 중 비속어/욕설 감지 상세</h3>
+                <div id="agent-profanity-container" style="display:none; margin-bottom: 12px;">
+                    <strong style="color: #991b1b;">🚨 상담사의 비속어 발화 검출</strong>
+                    <ul id="agent-profanity-list"
+                        style="margin: 8px 0 0 0; padding-left: 20px; color: #7f1d1d; font-size: 0.9rem; line-height: 1.5;">
+                    </ul>
+                </div>
+                <div id="customer-profanity-container" style="display:none;">
+                    <strong style="color: #991b1b;">🚨 고객의 비속어 발화 검출</strong>
+                    <ul id="customer-profanity-list"
+                        style="margin: 8px 0 0 0; padding-left: 20px; color: #7f1d1d; font-size: 0.9rem; line-height: 1.5;">
+                    </ul>
                 </div>
             </div>
 
@@ -328,10 +406,10 @@
             }
         }
 
-        // 드래그 앤 드롭 방지
+        // 드래그 앤 드롭 동작을 전체 화면(body)으로 확장
         const dropArea = document.getElementById('drop-area');
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-            dropArea.addEventListener(eventName, preventDefaults, false);
+            document.body.addEventListener(eventName, preventDefaults, false);
         });
 
         function preventDefaults(e) {
@@ -340,14 +418,20 @@
         }
 
         ['dragenter', 'dragover'].forEach(eventName => {
-            dropArea.addEventListener(eventName, () => dropArea.classList.add('dragging'), false);
+            document.body.addEventListener(eventName, () => {
+                dropArea.classList.add('dragging');
+                document.body.style.backgroundColor = '#eff6ff'; // 전체 화면 시각적 피드백
+            }, false);
         });
 
         ['dragleave', 'drop'].forEach(eventName => {
-            dropArea.addEventListener(eventName, () => dropArea.classList.remove('dragging'), false);
+            document.body.addEventListener(eventName, () => {
+                dropArea.classList.remove('dragging');
+                document.body.style.backgroundColor = ''; // 배경 복구
+            }, false);
         });
 
-        dropArea.addEventListener('drop', e => {
+        document.body.addEventListener('drop', e => {
             const dt = e.dataTransfer;
             const files = dt.files;
             if (files.length > 0 && files[0].name.toLowerCase().endsWith('.wav')) {
@@ -366,11 +450,13 @@
             const transcriptArea = document.getElementById('transcript-content');
             const summaryArea = document.getElementById('summary-content');
             const metaArea = document.getElementById('meta-info');
+            const profanityInfoArea = document.getElementById('profanity-info');
             const loadingStatus = document.getElementById('loading-status');
 
             startBtn.disabled = true;
             loading.style.display = 'block';
             metaArea.style.display = 'none';
+            profanityInfoArea.style.display = 'none';
             transcriptArea.innerText = '인식 중...';
             summaryArea.innerText = '대기 중...';
             loadingStatus.innerText = 'Apple Silicon Metal 가속으로 STT 분석 중...';
@@ -382,6 +468,7 @@
 
             const formData = new FormData();
             formData.append('file', selectedFile);
+            formData.append('speaker_separation', 'true');
 
             try {
                 // 동적 URL 바인딩 (로컬에서 파일로 열면 localhost 호출, 서버 아이피로 접속하면 해당 아이피 호출)
@@ -395,8 +482,117 @@
 
                 const data = await response.json();
 
-                transcriptArea.innerText = data.transcript || '(인식 결과 없음)';
-                summaryArea.innerText = data.summary || '(요약 실패)';
+                // 1. 대화내용 표시를 채팅하듯이 (카카오톡방처럼) 렌더링
+                if (data.segments && data.segments.length > 0) {
+                    transcriptArea.innerHTML = '';
+                    const chatContainer = document.createElement('div');
+                    chatContainer.className = 'chat-container';
+                    data.segments.forEach(seg => {
+                        let text = seg.text.trim();
+                        const isAgent = text.startsWith('상담사:');
+                        const isCustomer = text.startsWith('고객:');
+
+                        const msgBubble = document.createElement('div');
+                        msgBubble.className = isAgent ? 'chat-bubble agent' : (isCustomer ? 'chat-bubble customer' : 'chat-bubble agent');
+
+                        let cleanText = text;
+                        let speakerName = '진행자';
+                        if (isAgent) { cleanText = text.replace('상담사:', '').trim(); speakerName = '상담사 🎧'; }
+                        if (isCustomer) { cleanText = text.replace('고객:', '').trim(); speakerName = '고객 👤'; }
+
+                        if (seg.is_profane) {
+                            cleanText = `<span style="color: #ef4444; font-weight: bold;">${cleanText}</span>`;
+                        }
+
+                        msgBubble.innerHTML = `<div class="chat-speaker">${speakerName} <span class="chat-time">${seg.start.toFixed(1)}s - ${seg.end.toFixed(1)}s</span></div><div class="chat-text">${cleanText}</div>`;
+                        chatContainer.appendChild(msgBubble);
+                    });
+                    transcriptArea.appendChild(chatContainer);
+                } else {
+                    transcriptArea.innerText = data.transcript || '(인식 결과 없음)';
+                }
+
+                // 2. 전체요약/3줄요약 및 비속어 감지 표시
+                if (typeof data.summary === 'object' && data.summary !== null) {
+                    let summaryHTML = '';
+
+                    // 1) Profanity Info Rendering
+                    if (data.profanity_info) {
+                        const pi = data.profanity_info;
+                        if (pi.customer_detected || pi.agent_detected) {
+                            profanityInfoArea.style.display = 'block';
+
+                            const aContainer = document.getElementById('agent-profanity-container');
+                            const aList = document.getElementById('agent-profanity-list');
+                            if (pi.agent_detected && pi.agent_sentences.length > 0) {
+                                aContainer.style.display = 'block';
+                                aList.innerHTML = pi.agent_sentences.map(s => `<li>${s.replace('상담사:', '').trim()}</li>`).join('');
+                            } else {
+                                aContainer.style.display = 'none';
+                            }
+
+                            const cContainer = document.getElementById('customer-profanity-container');
+                            const cList = document.getElementById('customer-profanity-list');
+                            if (pi.customer_detected && pi.customer_sentences.length > 0) {
+                                cContainer.style.display = 'block';
+                                cList.innerHTML = pi.customer_sentences.map(s => `<li>${s.replace('고객:', '').trim()}</li>`).join('');
+                            } else {
+                                cContainer.style.display = 'none';
+                            }
+                        }
+                    }
+
+                    if (data.summary.is_profanity) {
+                        const words = data.summary.profanity_words ? data.summary.profanity_words.join(', ') : '없음';
+                        summaryHTML += `<div style="background-color: #fee2e2; color: #b91c1c; padding: 10px; border-radius: 8px; margin-bottom: 8px; font-weight: bold; border: 1px solid #fca5a5; font-size: 0.9rem;">` +
+                            `⚠️ [주의] 욕설/비속어가 감지되었습니다: ${words}` +
+                            `</div>`;
+                    }
+
+                    const fullSum = data.summary.full_summary || data.summary['전체 요약'] || data.summary.summary || data.summary['요약'] || '';
+                    const threeL = data.summary.three_lines || data.summary['3줄 요약'] || data.summary['핵심 3줄'] || data.summary['핵심사항'];
+
+                    if (!fullSum && (!threeL || (Array.isArray(threeL) && threeL.length === 0))) {
+                        // Fallback: 지정된 키를 벗어난 형태의 JSON 이면 그대로 원시 출력
+                        summaryHTML += `<div style="margin-bottom: 12px; white-space: pre-wrap;">` +
+                            `<div style="font-weight: 800; color: #1e3a8a; margin-bottom: 4px; font-size: 0.95rem;">📋 분석 결과 (지정 양식 오류)</div>` +
+                            `<div style="color: #1e40af; line-height: 1.5; background: #fff; padding: 10px; border-radius: 8px; border: 1px solid #bfdbfe; word-break: break-all; font-size: 0.9rem;">${JSON.stringify(data.summary, null, 2)}</div>` +
+                            `</div>`;
+                    } else {
+                        summaryHTML += `<div style="margin-bottom: 12px;">` +
+                            `<div style="font-weight: 800; color: #1e3a8a; margin-bottom: 4px; font-size: 0.95rem;">📋 전체 요약</div>` +
+                            `<div style="color: #1e40af; line-height: 1.5; background: #fff; padding: 10px; border-radius: 8px; border: 1px solid #bfdbfe; font-size: 0.9rem; white-space: pre-wrap;">${fullSum || '전체 요약 내용이 없습니다.'}</div>` +
+                            `</div>`;
+
+                        summaryHTML += `<div>` +
+                            `<div style="font-weight: 800; color: #1e3a8a; margin-bottom: 4px; font-size: 0.95rem;">💡 핵심 3줄 요약</div>` +
+                            `<ul style="color: #1e40af; padding-left: 20px; line-height: 1.5; background: #fff; padding: 10px 10px 10px 24px; border-radius: 8px; border: 1px solid #bfdbfe; margin: 0; font-size: 0.9rem;">`;
+
+                        if (Array.isArray(threeL)) {
+                            threeL.forEach(line => { summaryHTML += `<li style="margin-bottom: 4px;">${line}</li>`; });
+                        } else if (typeof threeL === 'object' && threeL !== null) {
+                            Object.entries(threeL).forEach(([k, v]) => { summaryHTML += `<li style="margin-bottom: 4px;"><strong>[${k}]</strong> ${v}</li>`; });
+                        } else if (typeof threeL === 'string') {
+                            summaryHTML += `<li style="margin-bottom: 4px;">${threeL}</li>`;
+                        } else {
+                            summaryHTML += `<li>3줄 요약 항목이 없습니다.</li>`;
+                        }
+                        summaryHTML += `</ul></div>`;
+                    }
+
+                    if (data.profanity_info && (data.profanity_info.customer_detected || data.profanity_info.agent_detected)) {
+                        summaryHTML += `<div style="margin-top: 16px; font-weight: bold; color: #dc2626; font-size: 0.95rem;">`;
+                        if (data.profanity_info.agent_detected) summaryHTML += `<div>* 🚨 상담사의 비속어가 검출되었습니다.</div>`;
+                        if (data.profanity_info.customer_detected) summaryHTML += `<div>* 🚨 고객의 비속어가 검출되었습니다.</div>`;
+                        summaryHTML += `</div>`;
+                    }
+
+                    // pre-wrap로 인한 공백 방지를 위해 #summary-content 의 white-space 를 무력화
+                    summaryArea.style.whiteSpace = "normal";
+                    summaryArea.innerHTML = summaryHTML;
+                } else {
+                    summaryArea.innerText = data.summary || '(요약 실패)';
+                }
 
                 // 메타 정보 표시
                 document.getElementById('stt-info').innerText = `STT: ${data.model_info.stt}`;
