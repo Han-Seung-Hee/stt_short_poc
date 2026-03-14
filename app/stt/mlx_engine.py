@@ -154,8 +154,7 @@ class MLXWhisperEngine(STTEngine):
         """단일 파일 전체를 한번에 처리합니다."""
         import mlx_whisper
 
-        # 콜센터 도메인에 맞는 프롬프트를 주어 인식률(CER) 향상 유도
-        initial_prompt = "다음은 고객센터 상담원과 고객의 통화 내용입니다. 자연스러운 한국어 존댓말이 사용됩니다."
+        initial_prompt = ""
 
         raw = mlx_whisper.transcribe(
             audio_path,
@@ -164,6 +163,9 @@ class MLXWhisperEngine(STTEngine):
             fp16=True,
             initial_prompt=initial_prompt,
             verbose=False,
+            condition_on_previous_text=False,
+            compression_ratio_threshold=1.35, # 반복 및 환각(Hallucination) 방지
+            no_speech_threshold=0.6,
         )
 
         segments = []

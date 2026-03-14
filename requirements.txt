@@ -33,3 +33,8 @@ httpx>=0.25.0
 
 # === 설정 ===
 pyyaml>=6.0
+korcen
+colorama
+
+# === MLX LLM ===
+mlx-lm>=0.14.0

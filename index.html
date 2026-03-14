@@ -471,8 +471,8 @@
             formData.append('speaker_separation', 'true');
 
             try {
-                // 동적 URL 바인딩 (로컬에서 파일로 열면 localhost 호출, 서버 아이피로 접속하면 해당 아이피 호출)
-                const baseUrl = window.location.protocol === 'file:' ? 'http://localhost:9123' : '';
+                // 어떤 환경에서든 백엔드 STT 연산 서버(9123 포트)로 직접 요청
+                const baseUrl = 'http://localhost:9123';
                 const response = await fetch(`${baseUrl}/api/v1/process`, {
                     method: 'POST',
                     body: formData
