@@ -14,8 +14,10 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
 
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse, FileResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_config, AppConfig
@@ -67,8 +69,14 @@ def create_llm_engine(config: AppConfig) -> LLMEngine:
             max_retries=config.llm.max_retries,
             prompt_type=config.llm.prompt_type,
         )
+    elif engine_type == "mlx":
+        from app.llm.mlx_lm_engine import MlxLMEngine
+        return MlxLMEngine(
+            model_name=config.llm.model_name,
+            prompt_type=config.llm.prompt_type,
+        )
     else:
-        raise ValueError(f"지원하지 않는 LLM 엔진: {engine_type}. 'ollama'를 사용하세요.")
+        raise ValueError(f"지원하지 않는 LLM 엔진: {engine_type}. 'ollama' 또는 'mlx'를 사용하세요.")
 
 
 # === 전역 상태 ===
@@ -188,7 +196,7 @@ async def serve_index():
     """웹 브라우저 접속 시 프론트엔드(index.html)를 반환합니다."""
     index_path = Path(__file__).parent.parent / "index.html"
     if index_path.exists():
-        return FileResponse(str(index_path))
+        return HTMLResponse(content=index_path.read_text(encoding="utf-8"))
     return JSONResponse(status_code=404, content={"message": "index.html 파일이 없습니다."})
 
 

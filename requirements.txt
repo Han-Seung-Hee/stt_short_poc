@@ -34,3 +34,11 @@ httpx>=0.25.0
 
 # === 설정 ===
 pyyaml>=6.0
+korcen
+colorama
+
+# === MLX LLM ===
+mlx-lm>=0.14.0
+
+# === TTS (테스트 데이터 생성용) ===
+edge-tts
