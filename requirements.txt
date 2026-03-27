@@ -11,12 +11,13 @@ uvicorn[standard]>=0.24.0
 python-multipart>=0.0.6
 
 # === STT (Mac: mlx-whisper) ===
-# Mac Apple Silicon 전용. Linux에서는 주석 처리 후 faster-whisper 사용
-mlx>=0.5.0
-mlx-whisper>=0.4.0
+# Mac Apple Silicon 환경에서만 자동 설치됩니다.
+mlx>=0.5.0; sys_platform == "darwin" and platform_machine == "arm64"
+mlx-whisper>=0.4.0; sys_platform == "darwin" and platform_machine == "arm64"
 
-# === STT (Linux CPU/GPU 전용) — Mac에서는 주석 처리 ===
-# faster-whisper>=1.0.0
+# === STT (Linux/Windows: faster-whisper) ===
+# 리눅스 및 윈도우 환경에서만 자동 설치됩니다.
+faster-whisper>=1.0.0; sys_platform == "linux" or sys_platform == "win32"
 
 # === NVIDIA GPU 가속 (Linux 필수) ===
 # CUDA libcudnn 에러 방지를 위해 GPU 환경이라면 아래 주석을 전면 해제하세요.
